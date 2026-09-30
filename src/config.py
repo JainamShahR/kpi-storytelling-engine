@@ -195,12 +195,16 @@ class AnomalySettings:
     def warmup_days(self) -> int:
         """Days of history needed before any day can be evaluated.
 
-        The baseline needs `baseline_weeks` seasonal cycles and the z-score
-        needs `zscore_min_periods` past deviations on top of that. Used by the
+        The baseline needs at least `baseline_weeks - 1` earlier cycles (3 of 4
+        weeks = 21 days) and the z-score needs `zscore_min_periods` past
+        deviations on top of that: 21 + 28 = 49 days by default. Used by the
         app and the evaluation to skip the un-scorable warm-up period instead
         of reporting it as "no anomalies found".
         """
-        return self.seasonal_period_days * self.baseline_weeks + self.zscore_min_periods
+        return (
+            self.seasonal_period_days * (self.baseline_weeks - 1)
+            + self.zscore_min_periods
+        )
 
 
 @dataclass(frozen=True)

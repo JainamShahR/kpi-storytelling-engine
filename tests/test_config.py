@@ -98,8 +98,8 @@ def test_settings_are_immutable(default_settings: Settings) -> None:
 
 
 def test_warmup_days_matches_the_rule(default_settings: Settings) -> None:
-    """Warm-up = baseline history (4 x 7) + minimum z-score history (28)."""
-    assert default_settings.anomaly.warmup_days == 7 * 4 + 28
+    """Warm-up = baseline history (3 of 4 weeks = 21 days) + 28 past deviations."""
+    assert default_settings.anomaly.warmup_days == 7 * (4 - 1) + 28
 
 
 def test_llm_urls_are_built_from_the_base_url() -> None:

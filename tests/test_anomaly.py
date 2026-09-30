@@ -1,24 +1,47 @@
 """Tests for `src.anomaly_detection`.
 
-Phase 4 covers the seasonal-naive baseline. Every series here is a tiny
-hand-made daily series starting on Monday 2024-01-01, so each expected value
-can be worked out on paper.
+Every series here is a small hand-made daily series starting on Monday
+2024-01-01. Baseline tests use exact values that can be checked on paper;
+detection tests use a level of 100 with seeded 1% noise, so the result is
+identical on every run.
 """
 
 from __future__ import annotations
+
+import logging
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.anomaly_detection import compute_deviations, seasonal_baseline
+from src.anomaly_detection import (
+    DETECTION_LEVELS,
+    compute_deviations,
+    detect_all_levels,
+    detect_anomalies,
+    naive_detector,
+    seasonal_baseline,
+    severity_from_z,
+)
 from src.config import Settings
+from src.preprocessing import clean_data
 
 
 def _daily(values: list[float], start: str = "2024-01-01") -> pd.Series:
     """Daily series starting on `start` (2024-01-01 was a Monday)."""
     index = pd.date_range(start, periods=len(values), freq="D")
     return pd.Series(values, index=index, dtype=float)
+
+
+def _noisy_daily(n_days: int, noise: float = 1.0, seed: int = 7) -> pd.Series:
+    """Level 100 plus seeded normal noise (1.0 = 1% of the level)."""
+    rng = np.random.default_rng(seed)
+    return _daily(list(100.0 + rng.normal(0.0, noise, n_days)))
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 - seasonal-naive baseline
+# ---------------------------------------------------------------------------
 
 
 def test_seasonal_baseline_is_median_of_same_weekday_lags() -> None:
@@ -82,3 +105,110 @@ def test_zero_baseline_and_gaps_are_handled(default_settings: Settings) -> None:
     with_gap = _daily([100.0] * 30).drop(pd.Timestamp("2024-01-10"))
     with pytest.raises(ValueError, match="consecutive day"):
         seasonal_baseline(with_gap)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 - robust z-score, rule, severity, naive detector
+# ---------------------------------------------------------------------------
+
+
+def test_known_drop_is_detected_with_correct_date_and_direction(
+    default_settings: Settings,
+) -> None:
+    """Spec test 3: an injected -30% drop is the only flagged day, as a decline."""
+    series = _noisy_daily(70)
+    series.iloc[60] *= 0.7                      # injected -30% drop on day 60
+
+    result = detect_anomalies(series, default_settings)
+    flagged = result[result["is_anomaly"]]
+
+    assert flagged["date"].tolist() == [series.index[60]]
+    assert flagged["direction"].tolist() == ["decline"]
+    # The first z-score appears exactly after the configured warm-up (21 + 28).
+    assert result["z_score"].first_valid_index() == default_settings.anomaly.warmup_days
+
+
+def test_zscore_uses_only_past_data(default_settings: Settings) -> None:
+    """Spec test 5: changing a later value never changes an earlier z-score."""
+    series = _noisy_daily(80)
+    before = detect_anomalies(series, default_settings)["z_score"]
+
+    changed = series.copy()
+    changed.iloc[65] = 1_000.0                  # change the "future" (day 65)
+    after = detect_anomalies(changed, default_settings)["z_score"]
+
+    pd.testing.assert_series_equal(before.iloc[:65], after.iloc[:65])
+    assert after.iloc[65] != before.iloc[65]    # the changed day itself does move
+
+
+def test_small_change_is_not_flagged_even_if_z_is_large(default_settings: Settings) -> None:
+    """Spec test 6: statistically unusual but commercially tiny (+3% < 5%)."""
+    series = _noisy_daily(70, noise=0.01)       # an extremely stable series
+    series.iloc[60] *= 1.03
+
+    day = detect_anomalies(series, default_settings).iloc[60]
+
+    assert abs(day["z_score"]) >= default_settings.anomaly.zscore_threshold
+    assert day["relative_deviation"] == pytest.approx(0.03, abs=0.001)
+    assert not day["is_anomaly"]
+    assert day["severity"] == "Normal"
+
+
+def test_severity_follows_configured_thresholds() -> None:
+    """Spec test 7: bands are threshold, +1, +2 and move with the threshold."""
+    z = pd.Series([2.99, 3.0, -3.99, 4.0, 4.99, -5.0, 9.0])
+    assert severity_from_z(z, threshold=3.0).tolist() == [
+        "Normal", "Moderate", "Moderate", "High", "High", "Critical", "Critical",
+    ]
+    assert severity_from_z(pd.Series([2.5, 3.5, 4.5]), threshold=2.5).tolist() == [
+        "Moderate", "High", "Critical",
+    ]
+
+
+def test_naive_rule_raises_echo_false_alarm_that_robust_rule_avoids(
+    default_settings: Settings,
+) -> None:
+    """A one-day -50% outage: the naive rule also flags the normal day one week
+    later (+100% vs the outage), the robust rule flags only the outage."""
+    series = _noisy_daily(63)
+    series.iloc[50] *= 0.5
+
+    naive = naive_detector(series)
+    robust = detect_anomalies(series, default_settings)["is_anomaly"]
+
+    assert naive.iloc[50] and naive.iloc[57]
+    assert robust.iloc[50] and not robust.iloc[57]
+
+
+def test_zero_mad_uses_epsilon_and_logs_a_warning(
+    default_settings: Settings, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A perfectly constant history has MAD = 0: no division by zero, a warning
+    is logged and a real -20% change is still detected."""
+    series = _daily([100.0] * 56 + [80.0])
+    with caplog.at_level(logging.WARNING, logger="src.anomaly_detection"):
+        result = detect_anomalies(series, default_settings)
+
+    assert any("MAD" in record.message for record in caplog.records)
+    last_day = result.iloc[-1]
+    assert np.isfinite(last_day["z_score"])
+    assert last_day["is_anomaly"] and last_day["direction"] == "decline"
+
+
+def test_detect_all_levels_monitors_company_and_every_segment(
+    small_kpi_df: pd.DataFrame, default_settings: Settings
+) -> None:
+    """12 series (total + 4 regions + 4 products + 3 channels); 14 days of data
+    is too little history, so nothing may be evaluated or flagged."""
+    results = detect_all_levels(clean_data(small_kpi_df), default_settings)
+
+    assert len(DETECTION_LEVELS) == 1 + 4 + 4 + 3
+    assert results["level"].nunique() == 12
+    assert len(results) == 12 * 14
+
+    west = results[results["level"] == "region=West"]
+    assert set(west["dimension"]) == {"region"} and set(west["category"]) == {"West"}
+    assert (west["actual"] == 1_200.0).all()
+
+    assert (results["severity"] == "Not evaluated").all()
+    assert not results["is_anomaly"].any()
