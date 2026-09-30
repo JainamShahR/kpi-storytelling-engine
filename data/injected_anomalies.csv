@@ -1,0 +1,28 @@
+anomaly_id,start_date,end_date,dimension,category,second_dimension,second_category,pct_change,direction,cause,has_note,is_demo
+A-001,2024-03-04,2024-03-05,region,North,product,Product D,0.5,increase,regional product launch campaign,True,False
+A-002,2024-03-31,2024-04-02,channel,Partner,,,-0.1,decline,partner contract dispute,True,False
+A-003,2024-04-28,2024-04-28,region,North,,,0.3,increase,new store openings,False,False
+A-004,2024-05-27,2024-05-27,region,West,,,-0.3,decline,distributor disruption,False,False
+A-005,2024-06-21,2024-06-22,channel,Partner,,,0.2,increase,partner bulk order,True,False
+A-006,2024-07-21,2024-07-23,region,North,,,-0.5,decline,severe weather disruption,False,False
+A-007,2024-08-15,2024-08-16,product,Product B,,,0.3,increase,competitor stock-out,True,False
+A-008,2024-09-13,2024-09-15,channel,Retail,,,0.1,increase,in-store promotion,True,False
+A-009,2024-10-12,2024-10-12,product,Product C,,,0.1,increase,competitor stock-out,True,False
+A-010,2024-11-08,2024-11-09,channel,Online,,,-0.2,decline,payment gateway failure,True,False
+A-011,2024-12-07,2024-12-09,product,Product D,,,-0.1,decline,price increase,True,False
+A-012,2024-12-31,2025-01-01,region,East,product,Product C,-0.3,decline,regional distributor disruption,False,False
+A-013,2025-01-28,2025-01-29,region,West,product,Product D,-0.5,decline,regional distributor disruption,True,False
+A-014,2025-02-27,2025-02-27,product,Product A,,,-0.3,decline,inventory shortage,False,False
+A-015,2025-03-23,2025-03-24,channel,Retail,,,-0.2,decline,store traffic decline,True,False
+A-016,2025-04-20,2025-04-21,channel,Online,,,0.2,increase,email marketing campaign,True,False
+A-017,2025-05-19,2025-05-21,product,Product B,,,-0.5,decline,price increase,True,False
+A-018,2025-06-18,2025-06-20,region,South,,,-0.1,decline,distributor disruption,False,False
+A-019,2025-07-15,2025-07-17,product,Product A,,,0.5,increase,marketing campaign,True,False
+A-020,2025-08-12,2025-08-14,region,East,,,0.1,increase,local festival promotion,True,False
+A-021,2025-09-07,2025-09-09,region,West,,,-0.5,decline,distributor disruption,True,True
+A-022,2025-09-07,2025-09-09,product,Product B,,,-0.3,decline,inventory shortage,True,True
+A-023,2025-09-07,2025-09-09,channel,Retail,,,-0.2,decline,store traffic decline,True,True
+A-024,2025-10-07,2025-10-08,region,East,,,0.5,increase,new store openings,True,False
+A-025,2025-11-01,2025-11-01,region,South,,,0.2,increase,new store openings,False,False
+A-026,2025-11-30,2025-11-30,product,Product C,,,-0.2,decline,supplier quality recall,True,False
+A-027,2025-12-29,2025-12-31,region,South,product,Product A,0.3,increase,local bundle promotion,True,False

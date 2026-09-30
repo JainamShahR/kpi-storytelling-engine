@@ -13,6 +13,9 @@ venv/
 .ruff_cache/
 .ipynb_checkpoints/
 
+# Generated local charts (recreate with: python generate_data.py --plot)
+reports/*.html
+
 # OS files
 .DS_Store
 Thumbs.db
