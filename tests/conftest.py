@@ -41,3 +41,27 @@ def small_kpi_df() -> pd.DataFrame:
     df["revenue"] = 100.0
     df["orders"] = 1
     return df
+
+
+#: Product sizes in `decomposition_df`: Product A is four times Product D.
+PRODUCT_WEIGHTS = {"Product A": 4, "Product B": 3, "Product C": 2, "Product D": 1}
+
+
+@pytest.fixture()
+def decomposition_df() -> pd.DataFrame:
+    """Clean-format KPI data for decomposition tests: 29 days x 48 segments.
+
+    Every day is identical: revenue = 10 x product weight. So per day:
+        total 1,200 | each region 300 | each channel 400
+        Product A 480 | B 360 | C 240 | D 120
+    The last day, Monday 2024-01-29, has exactly four reference days
+    (01-22, 01-15, 01-08, 01-01). Tests change revenue on that day only.
+    """
+    dates = pd.date_range("2024-01-01", periods=29, freq="D")
+    segments = pd.MultiIndex.from_product(
+        [REGIONS, PRODUCTS, CHANNELS], names=["region", "product", "channel"]
+    ).to_frame(index=False)
+    df = pd.DataFrame({"date": dates}).merge(segments, how="cross")
+    df["revenue"] = 10.0 * df["product"].map(PRODUCT_WEIGHTS)
+    df["orders"] = 1
+    return df

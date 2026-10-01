@@ -80,6 +80,11 @@ DIMENSIONS: dict[str, tuple[str, ...]] = {
     "channel": CHANNELS,
 }
 
+#: Root-cause decomposition is skipped when the total change is smaller than
+#: this share of the baseline: dividing by a near-zero total change makes the
+#: contribution percentages explode (e.g. +3,000% and -2,900%).
+MIN_DECOMPOSITION_CHANGE: float = 0.02
+
 
 class ConfigError(ValueError):
     """Raised when a configuration value is missing, unparsable or invalid.
